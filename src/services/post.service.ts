@@ -1,4 +1,4 @@
-import Post from '../models/Post.model';
+import models from '../models';
 import { CustomError } from '../errors/customError.error';
 
 function toSlug(title: string): string {
@@ -15,27 +15,34 @@ function toSlug(title: string): string {
 async function uniqueSlug(base: string): Promise<string> {
   let slug = base;
   let n = 1;
-  while (await Post.findOne({ slug })) {
+  while (await models.posts.findOne({ slug })) {
     slug = `${base}-${++n}`;
   }
   return slug;
 }
 
-export async function getPublishedPosts() {
-  return Post.find({ status: 'published' })
-    .populate('author', 'name email')
-    .sort({ publishedAt: -1 });
+export async function getPublishedPosts(page: number = 1, limit: number = 10) {
+  const skip = (page - 1) * limit;
+  const [posts, total] = await Promise.all([
+    models.posts.find({ status: 'published' })
+      .populate('author', 'name email')
+      .sort({ publishedAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    models.posts.countDocuments({ status: 'published' }),
+  ]);
+  return { posts, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 export async function getAllPosts(userId: string, accountType: string) {
   const filter = accountType === 'admin' ? {} : { author: userId };
-  return Post.find(filter)
+  return models.posts.find(filter)
     .populate('author', 'name email')
     .sort({ createdAt: -1 });
 }
 
 export async function getPostBySlug(slug: string) {
-  const post = await Post.findOne({ slug, status: 'published' }).populate('author', 'name');
+  const post = await models.posts.findOne({ slug, status: 'published' }).populate('author', 'name');
   if (!post) throw new CustomError('Post no encontrado', 404);
   return post;
 }
@@ -46,7 +53,7 @@ export async function createPost(
 ) {
   const base = toSlug(data.title);
   const slug = await uniqueSlug(base);
-  return Post.create({ ...data, slug, author: userId });
+  return models.posts.create({ ...data, slug, author: userId });
 }
 
 export async function updatePost(
@@ -55,7 +62,7 @@ export async function updatePost(
   userId: string,
   accountType: string
 ) {
-  const post = await Post.findById(id);
+  const post = await models.posts.findById(id);
   if (!post) throw new CustomError('Post no encontrado', 404);
   if (accountType !== 'admin' && post.author.toString() !== userId) {
     throw new CustomError('Sin permiso para editar este post', 403);
@@ -65,7 +72,7 @@ export async function updatePost(
 }
 
 export async function deletePost(id: string, userId: string, accountType: string) {
-  const post = await Post.findById(id);
+  const post = await models.posts.findById(id);
   if (!post) throw new CustomError('Post no encontrado', 404);
   if (accountType !== 'admin' && post.author.toString() !== userId) {
     throw new CustomError('Sin permiso para eliminar este post', 403);
@@ -74,7 +81,7 @@ export async function deletePost(id: string, userId: string, accountType: string
 }
 
 export async function togglePublish(id: string) {
-  const post = await Post.findById(id);
+  const post = await models.posts.findById(id);
   if (!post) throw new CustomError('Post no encontrado', 404);
   post.status = post.status === 'published' ? 'draft' : 'published';
   if (post.status === 'published' && !post.publishedAt) {
