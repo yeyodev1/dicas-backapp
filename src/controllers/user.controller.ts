@@ -38,7 +38,7 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
 export async function updateUser(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
-    const user = await userService.updateUser(id, req.body);
+    const user = await userService.updateUser(id as string, req.body);
     
     res.status(200).send({
       message: "User updated successfully.",
@@ -53,7 +53,7 @@ export async function updateUser(req: AuthRequest, res: Response, next: NextFunc
 export async function deleteUser(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
-    await userService.deleteUser(id);
+    await userService.deleteUser(id as string);
     
     res.status(200).send({
       message: "User deleted successfully."
